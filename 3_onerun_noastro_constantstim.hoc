@@ -1,0 +1,458 @@
+load_file("nrngui.hoc")
+cvode_active(0)
+dt = 2
+
+dist=7
+rel=0.5
+
+numbasal=70
+
+xopen("geo9068802.hoc")             // geometry file
+xopen("fixnseg.hoc")           
+
+Cm    = 2.4 
+Rm = 28000/Cm
+RaAll= 550
+RaAx = 50
+
+Vrest = -70
+dt = 0.1
+gna =  .043			// antes: .043
+AXONM = 5
+gkdr = 0.025
+celsius = 35.0  
+ka =  0.069
+ghd=0.000003    // antes: 0.0000011
+gkm=0.00002
+gcat=0.00004	  
+gahp=0.001        // antes: 0.001
+gahp_slow=0.00001
+gcak=0.000021
+gcal=0.002
+
+objref stim, apc, stim_amp_val, outfile, v1
+
+forsec "axon" {insert pas e_pas=Vrest g_pas = 1/Rm Ra=RaAx cm=Cm}
+forsec "soma" {insert pas e_pas=Vrest g_pas = 1/Rm Ra=RaAll cm=Cm}
+forsec "dendrite"{insert pas e_pas=Vrest g_pas = 1/Rm Ra=RaAll cm=Cm}
+forsec "user5" {insert pas e_pas=Vrest g_pas = 1/Rm Ra=RaAll cm=Cm}
+
+access soma
+
+freq=50
+geom_nseg()
+
+axon {nseg=11}
+
+distance()
+
+stim = new IClamp(.5)
+stim.del=50
+stim.dur=1e9
+stim.amp=0.3
+
+tstop=6000
+
+forsec "axon" {
+                insert nax gbar_nax=gna*AXONM
+                insert kdr gkdrbar_kdr=gkdr*AXONM
+                insert kap gkabar_kap = ka
+				insert km gbar_km=gkm*AXONM
+}
+
+forsec "soma" {
+		insert hd ghdbar_hd=ghd	
+                insert na3 gbar_na3=gna*AXONM
+                insert kdr gkdrbar_kdr=gkdr*AXONM
+                insert kap gkabar_kap = ka
+                insert cat  gcatbar_cat=gcat
+		insert cacum tau_cacum=200 depth_cacum=diam/2
+		insert KahpM95 gbar_KahpM95 = gahp*AXONM 
+		insert KsAHP gbar_KsAHP = gahp_slow*AXONM 
+		insert km gbar_km=gkm
+		insert cagk gbar_cagk=gcak
+		insert cal gcalbar_cal =gcal
+}
+
+for i=0, numbasal-1 dendrite[i] {
+                insert cat  gcatbar_cat=gcat
+		insert cacum tau_cacum=200 depth_cacum=diam/2
+		insert KahpM95 gbar_KahpM95 = gahp
+		insert KsAHP gbar_KsAHP = gahp_slow
+        insert cagk gbar_cagk=gcak
+        insert cal gcalbar_cal =gcal	
+        insert hd ghdbar_hd=ghd	
+                insert na3 gbar_na3=gna
+                insert kdr gkdrbar_kdr=gkdr
+		insert kap gkabar_kap=0
+		insert kad gkabar_kad=0	
+
+		for (x,0) { xdist = distance(x)
+                	ghdbar_hd(x) = ghd*(1+3*xdist/100)
+                		if (xdist > 100){
+                        		gkabar_kad(x) = ka*(1+xdist/100)
+                			} else {
+                        		gkabar_kap(x) = ka*(1+xdist/100)
+               				}
+		}		
+}
+
+                
+forsec "apical_dendrite" {
+		insert hd ghdbar_hd=ghd	
+                insert na3 gbar_na3=gna
+                insert kdr gkdrbar_kdr=gkdr
+		insert kap gkabar_kap=0
+		insert kad gkabar_kad=0
+		insert cacum tau_cacum=200 depth_cacum=diam/2
+		insert KahpM95 gbar_KahpM95 = gahp
+		insert KsAHP gbar_KsAHP = gahp_slow
+        insert cagk gbar_cagk=gcak			
+                insert cat  gcatbar_cat=gcat
+				insert cal gcalbar_cal =gcal
+
+		for (x,0) { xdist = distance(x)
+                	ghdbar_hd(x) = ghd*(1+3*xdist/100)
+                		if (xdist > 100){
+                        		gkabar_kad(x) = ka*(1+xdist/100)
+                			} else {
+                        		gkabar_kap(x) = ka*(1+xdist/100)
+               				}
+		}
+}
+
+forsec "user5" {
+		insert hd ghdbar_hd=ghd	
+                insert na3 gbar_na3=gna
+                insert kdr gkdrbar_kdr=gkdr
+		insert kap gkabar_kap=0
+		insert kad gkabar_kad=0
+		insert cacum tau_cacum=200 depth_cacum=diam/2
+                insert cat  gcatbar_cat=gcat
+		insert KahpM95 gbar_KahpM95 = gahp
+		insert KsAHP gbar_KsAHP = gahp_slow
+        insert cagk gbar_cagk=gcak	
+        insert cal gcalbar_cal =gcal		
+
+		for (x,0) { xdist = distance(x)
+                	ghdbar_hd(x) = ghd*(1+3*xdist/100)
+                		if (xdist > 100){
+                        		gkabar_kad(x) = ka*(1+xdist/100)
+                			} else {
+                        		gkabar_kap(x) = ka*(1+xdist/100)
+               				}
+		}
+}
+
+/*
+// astrocito y sinapsis NMDA
+objref astro_nmda
+soma astro_nmda = new NMDAcu(0.5)
+
+astro_nmda.gNMDAmax = 0.001 
+astro_nmda.enmda = 0
+
+objref astro_stim
+astro_stim = new NetStim()
+
+astro_stim.start = 500  // cuándo libera glutamato
+astro_stim.number = 15
+astro_stim.interval = 50
+
+
+objref astro_nc
+astro_nc = new NetCon(astro_stim, astro_nmda)
+
+astro_nc.weight = 5   // escala de entrada
+*/
+
+proc init() {
+	t=0
+
+        forall {
+        v=Vrest
+        if (ismembrane("nax") || ismembrane("na3")) {ena=55}
+        if (ismembrane("KahpM95") || ismembrane("kap") || ismembrane("kad") || ismembrane("km") || ismembrane("cagk")) {ek=-90}
+        if (ismembrane("hd") ) {ehd_hd=-30}
+	}
+	finitialize(Vrest)
+        fcurrent()
+
+        forall {
+	for (x) {
+	if (ismembrane("na3")||ismembrane("nax")){e_pas(x)=v(x)+(ina(x)+ik(x))/g_pas(x)}
+	if (ismembrane("hd")) {e_pas(x)=e_pas(x)+i_hd(x)/g_pas(x)}
+	if (ismembrane("cat")||ismembrane("cat")){e_pas(x)=e_pas(x)+ica(x)/g_pas(x)}
+		}
+	}
+	v_prev = soma.v(0.5)
+}
+
+// Estimulo inicial manual
+stim_amp_val = new Vector()
+initial_amp = 0.8
+increment = 0.02
+
+runtimes = 1
+
+for i = 0, runtimes - 1 {
+    stim_amp_val.append(initial_amp + i * increment)
+}
+
+strdef filename
+filename = "output_data_70.txt"
+
+outfile = new File()
+
+proc open_file() {
+    if (outfile.wopen(filename)) {
+        outfile.printf("Stimulus Amplitude\tAction Potential Count\n")
+        printf("Output file %s opened for writing.\n", filename)
+    } else {
+        printf("Could not open %s for writing\n", filename)
+    }
+}
+
+open_file()
+
+xpanel("Run Control")
+xvalue("Simulation Repetitions", "runtimes")
+xbutton("Run", "gorun()")
+xpanel()
+
+
+proc gorun() {
+    for run_index = 0, runtimes-1 {
+        single_run(run_index)
+    }
+	finalize()
+}
+
+soma apc = new APCount(.5)
+v1 = new Vector()
+apc.record(v1)
+// comprueba si se ha vuelto a hiperpolarizar (empieza en false para evitar estimulo en t=0)
+flag_ready = 0
+v_now = 0
+
+proc advance() {
+	if (t >= tstop) {
+		print "apc"
+		print apc.n
+	}
+
+	fadvance()
+
+    v_now = soma.v(0.5)
+
+    // --- detectar recuperación ---
+    if (flag_ready == 1 && v_prev < v_now && v_now > Vrest - 0.2) {
+
+        print ">>> CRUCE en t=", t, " v=", v_now
+
+        stim.del = t
+        stim.dur = 200
+        stim.amp = 0.85
+
+        print ">>> ESTIMULO lanzado en t=", t
+
+        flag_ready = 0
+    }
+
+    // --- rearme cuando esté hiperpolarizada ---
+    if (v_now < Vrest - 2) {
+        if (flag_ready == 0) {
+            print "flag_ready -> 1 en t=", t, " v=", v_now
+        }
+        flag_ready = 1
+    }
+
+    v_prev = v_now
+	
+}
+
+// guardar datos
+objref tvec, vvec, caivec, gkvec
+
+tvec = new Vector()
+vvec = new Vector()
+caivec = new Vector()
+gkvec = new Vector()
+
+tvec.record(&t)
+soma vvec.record(&v(0.5))
+soma caivec.record(&cai(0.5))
+soma gkvec.record(&gksahp_KsAHP(0.5))
+
+objref f
+strdef filename2
+filename2 = "all_runs_astro.dat"
+
+f = new File()
+f.wopen(filename2)
+
+// cabecera
+f.printf("run t v cai gkahp\n")
+
+proc single_run() {
+    stdinit()
+	print "Running with tstop =", tstop
+	print "Stim duration =", stim.dur
+	print "GkAHP =", gkahp_KahpM95(0.5)
+	print "Gksahp =", gksahp_KsAHP(0.5)
+    access soma[0]
+
+    run_index = $1
+
+    stim.amp = stim_amp_val.x[run_index]
+
+    print "RUNNING SIMULATION ", run_index + 1, " with stim.amp = ", stim.amp
+
+    continuerun(tstop)
+
+	// guardar datos
+	strdef fname
+	sprint(fname, "run_%d.dat", run_index)
+
+	// ---- GUARDAR ----
+    for i=0, tvec.size()-1 {
+        f.printf("%d %g %g %g %g\n", run_index, tvec.x[i], vvec.x[i], caivec.x[i], gkvec.x[i])
+    }
+
+    // ---- LIMPIAR ----
+    tvec.resize(0)
+    vvec.resize(0)
+    caivec.resize(0)
+    gkvec.resize(0)
+
+    print "Simulation run ", run_index + 1, " completed.\n", "APC:", apc.n
+	print "Voltaje final:", soma.v(0.5)
+		
+    if (outfile.isopen()) {
+        outfile.printf("%g\t%d\n", stim.amp, v1.size())
+        printf("APC for run %d written to %s\n", run_index + 1, filename)
+    } else {
+    printf("Could not open %s for appending\n", filename)
+	}
+}
+
+proc finalize() {
+    outfile.close()
+    printf("Output file %s closed.\n", filename)
+	f.close
+	printf("Output file %s closed.\n", filename2)
+}
+
+//////////////////////////////////////////
+objref gkm_field, gahp_field, gcak_field, update_button
+
+proc update_conductances() {
+        forsec "axon" {
+        gbar_km = gkm*AXONM
+		gkdrbar_kdr=gkdr*AXONM
+		gbar_nax=gna*AXONM
+		gkabar_kap = ka
+        }
+	forsec "soma" {
+	    gbar_km = gkm
+        gbar_KahpM95 = gahp*AXONM
+		gbar_KahpSlow = gahp_slow*AXONM
+        gbar_cagk = gcak
+		gkdrbar_kdr = gkdr*AXONM
+		gbar_na3=gna*AXONM
+		gkabar_kap = ka
+		ghdbar_hd=ghd
+		gcatbar_cat=gcat
+		gcalbar_cal =gcal
+	}
+	for i=0, numbasal-1 dendrite[i] {
+	    gbar_KahpM95 = gahp
+		gbar_KahpSlow = gahp_slow
+        gbar_cagk = gcak
+		gcatbar_cat=gcat
+		gcalbar_cal =gcal
+		gbar_na3=gna
+		gkdrbar_kdr=gkdr
+				
+						for (x,0) { xdist = distance(x)
+		            ghdbar_hd(x) = ghd*(1+3*xdist/100)
+		                		if (xdist > 100){
+                        		gkabar_kad(x) = ka*(1+xdist/100)
+                			} else {
+                        		gkabar_kap(x) = ka*(1+xdist/100)
+               				}
+		}
+	}
+	forsec "apical_dendrite" {
+	    gbar_KahpM95 = gahp
+		gbar_KahpSlow = gahp_slow
+        gbar_cagk = gcak
+		gkdrbar_kdr=gkdr
+		gbar_na3=gna
+		gcatbar_cat=gcat
+		gcalbar_cal =gcal
+		
+		
+		for (x,0) { xdist = distance(x)
+		            ghdbar_hd(x) = ghd*(1+3*xdist/100)
+		                		if (xdist > 100){
+                        		gkabar_kad(x) = ka*(1+xdist/100)
+                			} else {
+                        		gkabar_kap(x) = ka*(1+xdist/100)
+               				}
+		}
+		
+	}
+	forsec "user5" {
+	    gbar_KahpM95 = gahp
+		gbar_KahpSlow = gahp_slow
+        gbar_cagk = gcak
+		gkdrbar_kdr=gkdr
+		gbar_na3=gna
+		gcatbar_cat=gcat
+		gcalbar_cal =gcal
+		
+		for (x,0) { xdist = distance(x)
+		            ghdbar_hd(x) = ghd*(1+3*xdist/100)
+		                		if (xdist > 100){
+                        		gkabar_kad(x) = ka*(1+xdist/100)
+                			} else {
+                        		gkabar_kap(x) = ka*(1+xdist/100)
+               				}
+		}
+		
+	}
+	
+    print "Updated conductances: gkm=", gkm, ", gahp=", gahp, ", gcak=", gcak, ", gna=", gna, ", ka=", ka, ", ghd=", ghd, ", gkdr=", gkdr, ", gcat=", gcat, ", gcal=", gcal, " gahp_slow=", gahp_slow
+}
+
+stim_amp = stim.amp
+
+proc update_stim_amp() {
+    stim.amp = stim_amp
+    print "Updated stim.amp: ", stim.amp
+}
+
+xpanel("Update Parameters")
+xvalue("gkm", &gkm)
+xvalue("gahp", &gahp)
+xvalue("gahp_slow", &gahp_slow)
+xvalue("gcak", &gcak)
+xvalue("gkdr", &gkdr)
+xvalue("gna", &gna)
+xvalue("ka", &ka)
+xvalue("ghd", &ghd)
+xvalue("gcat", &gcat)
+xvalue("gcal", &gcal)
+xbutton("Update Conductances", "update_conductances()")
+xvalue("stim.amp", &stim_amp)
+xbutton("Update stim.amp", "update_stim_amp()")
+xpanel()
+
+proc run_simulation() {
+    run()
+    print "APC at the end of the simulation: ", apc.n
+}
+
+
+load_file("simulation.ses")
